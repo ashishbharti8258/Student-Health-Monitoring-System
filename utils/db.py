@@ -149,3 +149,53 @@ def fetch_live_metrics() -> Optional[Dict]:
     with engine.connect() as conn:
         row = conn.execute(query).mappings().first()
     return dict(row) if row else None
+
+
+# Columns the health_records table actually has (mirrors the DDL in
+# init_schema). Anything outside this list in an uploaded file is dropped;
+# anything missing is written as NULL.
+TABLE_COLUMNS = [
+    "student_id", "gender", "age",
+    "sleep_duration", "heart_rate", "bmi", "calorie_expenditure",
+    "step_count", "exercise_duration", "water_intake",
+    "stress_level", "physical_activity_level", "health_condition",
+]
+
+
+def save_dataframe_to_db(df: pd.DataFrame, mode: str = "append") -> int:
+    """
+    Persist an uploaded DataFrame into the cloud Postgres table, so it's no
+    longer just a one-session upload but part of the durable dataset.
+
+    mode:
+        "append"  - add these rows to whatever's already in the table.
+        "replace" - wipe the table first, then insert only these rows.
+
+    Returns the number of rows written. Column names are normalized the
+    same way as everywhere else in the app (lowercase, spaces -> underscores).
+    """
+    engine = get_engine()
+    if engine is None:
+        raise RuntimeError(
+            "PostgreSQL isn't configured. Add credentials to "
+            "`.streamlit/secrets.toml` (see secrets.toml.example)."
+        )
+    init_schema()
+
+    clean = df.copy()
+    clean.columns = [c.strip().lower().replace(" ", "_") for c in clean.columns]
+    for col in TABLE_COLUMNS:
+        if col not in clean.columns:
+            clean[col] = None
+    clean = clean[TABLE_COLUMNS]
+
+    if mode == "replace":
+        with engine.begin() as conn:
+            conn.execute(text(f"TRUNCATE TABLE {TABLE_NAME} RESTART IDENTITY"))
+
+    clean.to_sql(TABLE_NAME, engine, if_exists="append", index=False, method="multi", chunksize=500)
+
+    # Invalidate cached reads so the newly saved rows show up immediately.
+    fetch_dataframe.clear()
+    fetch_live_metrics.clear()
+    return len(clean)
