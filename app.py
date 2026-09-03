@@ -1,79 +1,58 @@
-import os
-import pandas as pd
 import streamlit as st
 
-from utils.config import DATA_PATH
-from utils.preprocessing import artifacts_exist
+from utils.data_loader import load_dataset
+from utils.model_utils import artifacts_exist
 
-st.set_page_config(
-    page_title="Student Health Monitoring System",
-    page_icon="🩺",
-    layout="wide",
-)
+st.set_page_config(page_title="HealthGuard AI", layout="wide", page_icon="🩺")
 
-@st.cache_data
-def load_dataset():
-    if not os.path.exists(DATA_PATH):
-        return None
-    return pd.read_csv(DATA_PATH)
+st.title("🛡️ HealthGuard AI: Student Health Monitoring")
+st.markdown("### Predictive Analytics & Risk Stratification Dashboard")
 
+df = load_dataset()
+record_count = f"{len(df):,}" if df is not None else "No data loaded"
+model_ready = artifacts_exist()
 
-def main():
-    st.title("🩺 AI-Powered Student Health Monitoring & Health Risk Prediction")
-    st.caption(
-        "An interactive dashboard for exploring student health data and predicting "
-        "health risk using a trained machine learning model."
-    )
-
-    df = load_dataset()
-    model_ready = artifacts_exist()
-
-    col1, col2 = st.columns(2)
-    with col1:
-        if df is not None:
-            st.success(f"Dataset loaded: **{df.shape[0]:,}** students, **{df.shape[1]}** columns.")
-        else:
-            st.warning(
-                f"No dataset found at `{DATA_PATH}`. Place your `train.csv` there "
-                "(as `student_health_data.csv`) to unlock all pages."
-            )
-    with col2:
+with st.container(border=True):
+    col1, col2, col3 = st.columns([2, 1, 1])
+    col1.write("This interactive dashboard explores student health data and predicts risk using a trained ML model.")
+    col2.metric("Total Records", record_count)
+    with col3:
         if model_ready:
-            st.success("Trained model artifacts found — AI predictions are ready.")
+            st.success("Model Active")
         else:
-            st.warning(
-                "No trained model found. Run `python train_model.py` after adding the "
-                "dataset to generate `models/health_model.pkl`."
-            )
+            st.warning("Model Not Found")
 
-    st.divider()
+st.divider()
 
-    st.subheader("What you can do here")
-    left, right = st.columns(2)
-    with left:
-        st.markdown(
-            "- **Health Overview** — dataset-wide KPIs, risk distribution, and key histograms\n"
-            "- **Student Analysis** — look up an individual student's full health profile "
-            "and a 0-100 Health Score"
-        )
-    with right:
-        st.markdown(
-            "- **Health Analytics** — explore relationships between health parameters with "
-            "filters, scatter plots, box plots, and a correlation heatmap\n"
-            "- **AI Health Prediction** — enter health parameters and get a live model "
-            "prediction with confidence"
-        )
+st.subheader("Dashboard Modules")
+c1, c2 = st.columns(2)
 
-    st.info(
-        "**Disclaimer:** This dashboard is an educational / portfolio Data Science project. "
-        "The Health Score and AI predictions are analytical tools trained on a Kaggle dataset "
-        "— they are **not** medical diagnoses and should never replace professional medical advice.",
-        icon="ℹ️",
-    )
+# BUG FIX: these switch_page() calls pointed at filenames that don't match
+# the actual files in pages/ (e.g. "pages/01_Health_Overview.py" vs the
+# real "pages/1_Health_Overview.py"), which raises a
+# StreamlitAPIException at click time. Paths below match the real files.
+with c1:
+    with st.container(border=True):
+        st.markdown("#### 📊 Health Overview")
+        st.write("Dataset-wide KPIs, risk distribution, and key telemetry histograms.")
+        if st.button("Open Overview", key="b1"):
+            st.switch_page("pages/1_Health_Overview.py")
 
-    st.sidebar.markdown("### Navigation")
-    st.sidebar.markdown("Use the pages above to explore the dashboard.")
+    with st.container(border=True):
+        st.markdown("#### 🧑‍🎓 Student Analysis")
+        st.write("Look up individual student profiles and transparent health scores.")
+        if st.button("Open Analysis", key="b2"):
+            st.switch_page("pages/2_Student_Analysis.py")
 
+with c2:
+    with st.container(border=True):
+        st.markdown("#### 🔬 Health Analytics")
+        st.write("Explore multi-variable relationships with filters and scatter plots.")
+        if st.button("Open Analytics", key="b3"):
+            st.switch_page("pages/3_Health_Analytics.py")
 
-if __name__ == "__main__":
-    main()
+    with st.container(border=True):
+        st.markdown("#### 🤖 AI Prediction")
+        st.write("Enter parameters to get a live model prediction and feature attribution.")
+        if st.button("Open AI Predictor", key="b4"):
+            st.switch_page("pages/4_AI_Health_Prediction.py")

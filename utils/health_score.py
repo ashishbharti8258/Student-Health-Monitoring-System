@@ -10,6 +10,7 @@ _WEIGHTS = {
     "stress_level": 0.10,
 }
 
+
 def _score_in_range(value: float, low: float, high: float) -> float:
     """1.0 inside [low, high], linearly decaying to 0 as it moves further away."""
     if low <= value <= high:

@@ -1,5 +1,6 @@
 from typing import Dict, List
 
+
 def generate_recommendations(inputs: Dict) -> List[str]:
     tips = []
 

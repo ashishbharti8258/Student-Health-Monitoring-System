@@ -41,7 +41,7 @@ def scatter(df, x, y, color=None, title=None):
     fig = px.scatter(
         df, x=x, y=y, color=color, opacity=0.6,
         title=title or f"{x.replace('_', ' ').title()} vs {y.replace('_', ' ').title()}",
-        color_discrete_sequence=PALETTE, trendline=None,
+        color_discrete_sequence=PALETTE,
     )
     fig.update_layout(xaxis_title=x.replace("_", " ").title(), yaxis_title=y.replace("_", " ").title())
     return fig
