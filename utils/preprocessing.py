@@ -1,104 +1,103 @@
 import os
 import joblib
 import pandas as pd
+import streamlit as st
 
-from utils.feature_engineering import add_engineered_features
 from utils.config import MODEL_PATH, PREP_PATH
+from utils.feature_engineering import add_engineered_features
 
 
-def artifacts_exist() -> bool:
+# check if models exist
+def artifacts_exist():
     return os.path.exists(MODEL_PATH) and os.path.exists(PREP_PATH)
 
 
+# load saved model and preprocessing dict
+@st.cache_resource(show_spinner=False)
 def load_artifacts():
-    """Load the trained model + all fitted preprocessing objects."""
     if not artifacts_exist():
-        raise FileNotFoundError(
-            "Trained model artifacts not found in /models. "
-            "Run `python train_model.py` first (after placing your dataset "
-            "in data/student_health_data.csv)."
-        )
+        raise FileNotFoundError("Model files not found! Please check models/ folder.")
+    
     model = joblib.load(MODEL_PATH)
     prep = joblib.load(PREP_PATH)
     return model, prep
 
 
-def transform(df_raw: pd.DataFrame, prep: dict) -> pd.DataFrame:
-    """
-    Apply the full training-time preprocessing pipeline to new data
-    (either a full raw dataset or a single-row DataFrame built from a
-    Streamlit form). Returns a DataFrame with columns/order matching
-    exactly what the model was trained on.
-    """
+# preprocessing function to transform input dataframe
+def transform(df_raw, prep):
     df = df_raw.copy()
 
-    numerical_features = prep["numerical_features"]
-    categorical_features = prep["categorical_features"]
-    high_missing_features = prep["high_missing_features"]
-    numerical_medians = prep["numerical_medians"]
-    dummy_columns = prep["dummy_columns"]
-    feature_columns = prep["feature_columns"]
+    # extract stuff from saved prep dict
+    num_cols = prep["numerical_features"]
+    cat_cols = prep["categorical_features"]
+    missing_cols = prep["high_missing_features"]
+    medians = prep["numerical_medians"]
+    dummy_cols = prep["dummy_columns"]
+    final_feature_order = prep["feature_columns"]
     scaler = prep["scaler"]
 
-    # 1. Missing-value indicator flags (computed BEFORE any imputation)
-    for feature in high_missing_features:
-        if feature in df.columns:
-            df[f"{feature}_isna"] = df[feature].isnull().astype(int)
+    # 1. missing flags
+    for col in missing_cols:
+        if col in df.columns:
+            df[f"{col}_isna"] = df[col].isnull().astype(int)
         else:
-            df[f"{feature}_isna"] = 0
+            df[f"{col}_isna"] = 0
 
-    # 2. Categorical NaN -> 'Unknown'
-    for feature in categorical_features:
-        if feature in df.columns:
-            df[feature] = df[feature].fillna("Unknown")
+    # 2. fill missing categoricals with Unknown
+    for col in cat_cols:
+        if col in df.columns:
+            df[col] = df[col].fillna("Unknown")
         else:
-            df[feature] = "Unknown"
+            df[col] = "Unknown"
 
-    # 3. Numerical NaN -> TRAINING median (avoids leakage from new data)
-    for feature in numerical_features:
-        if feature in df.columns:
-            df[feature] = df[feature].fillna(numerical_medians[feature])
+    # 3. fill numerical nulls with median
+    for col in num_cols:
+        if col in df.columns:
+            df[col] = df[col].fillna(medians[col])
         else:
-            df[feature] = numerical_medians[feature]
+            df[col] = medians[col]
 
-    # 4. One-hot encode categoricals, aligned to training dummy columns
-    columns_before_encoding = set(df.columns)  # includes *_isna flags - excluded from the dummy check below
-    df = pd.get_dummies(df, columns=categorical_features, drop_first=True, dtype=int)
-    new_dummy_cols = [c for c in df.columns if c not in columns_before_encoding]
-    for col in dummy_columns:
+    # 4. one-hot encoding
+    cols_before = set(df.columns)
+    df = pd.get_dummies(df, columns=cat_cols, drop_first=True, dtype=int)
+    
+    new_dummies = [c for c in df.columns if c not in cols_before]
+    for col in dummy_cols:
         if col not in df.columns:
             df[col] = 0
-    # drop any category dummy that wasn't seen during training (safety net, e.g. an unseen category)
-    extra_dummy_cols = [c for c in new_dummy_cols if c not in dummy_columns]
-    if extra_dummy_cols:
-        df = df.drop(columns=extra_dummy_cols)
+            
+    # drop extra columns if any
+    extra_cols = [c for c in new_dummies if c not in dummy_cols]
+    if extra_cols:
+        df = df.drop(columns=extra_cols)
 
-    # 5. Scale numeric columns with the training-fitted scaler
-    df[numerical_features] = scaler.transform(df[numerical_features])
+    # 5. scale numerical columns
+    df[num_cols] = scaler.transform(df[num_cols])
 
-    # 6. Engineered cross-features
+    # 6. feature engineering
     df = add_engineered_features(df)
 
-    # 7. Final reindex to the exact training feature order
-    df = df.reindex(columns=feature_columns, fill_value=0)
+    # 7. match exact training columns
+    df = df.reindex(columns=final_feature_order, fill_value=0)
 
     return df
 
 
-def predict(df_raw: pd.DataFrame, model, prep: dict):
-    """
-    Run the full pipeline + model on raw input and return
-    (predicted_labels, confidence_per_row, class_probabilities_df).
-    """
+# main predict function
+def predict(df_raw, model, prep):
     X = transform(df_raw, prep)
+    
+    # get label prediction
     pred_encoded = model.predict(X)
-    pred_labels = prep["target_encoder"].inverse_transform(pred_encoded)
+    pred_label = prep["target_encoder"].inverse_transform(pred_encoded)[0]
 
-    proba_df = None
+    proba_series = None
     confidence = None
+    
+    # check if model supports probabilities
     if hasattr(model, "predict_proba"):
         proba = model.predict_proba(X)
-        proba_df = pd.DataFrame(proba, columns=prep["target_encoder"].classes_, index=df_raw.index)
-        confidence = proba.max(axis=1)
+        proba_series = pd.Series(proba[0], index=prep["target_encoder"].classes_)
+        confidence = float(proba[0].max())
 
-    return pred_labels, confidence, proba_df
+    return pred_label, confidence, proba_series

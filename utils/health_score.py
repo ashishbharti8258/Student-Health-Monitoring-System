@@ -1,6 +1,6 @@
 from typing import Dict, Optional
-
-_WEIGHTS = {
+# Weights for calculating overall health score
+WEIGHTS = {
     "sleep_duration": 0.20,
     "step_count": 0.15,
     "exercise_duration": 0.15,
@@ -11,43 +11,71 @@ _WEIGHTS = {
 }
 
 
-def _score_in_range(value: float, low: float, high: float) -> float:
-    """1.0 inside [low, high], linearly decaying to 0 as it moves further away."""
-    if low <= value <= high:
-        return 1.0
-    span = max(high - low, 1e-6)
-    distance = (low - value) if value < low else (value - high)
-    return max(0.0, 1.0 - distance / span)
+def compute_health_score(inputs):
+    scores = {}
 
+    # 1. Sleep score (ideal 7-9 hrs)
+    sleep = inputs.get("sleep_duration")
+    if sleep is not None:
+        if 7 <= sleep <= 9:
+            scores["sleep_duration"] = 1.0
+        elif sleep < 7:
+            scores["sleep_duration"] = max(0.0, sleep / 7.0)
+        else:
+            scores["sleep_duration"] = max(0.0, 1.0 - (sleep - 9) / 2.0)
 
-def _score_at_least(value: float, target: float) -> float:
-    if value >= target:
-        return 1.0
-    return max(0.0, value / target)
+    # 2. Steps score (target 8000)
+    steps = inputs.get("step_count")
+    if steps is not None:
+        scores["step_count"] = min(1.0, steps / 8000.0)
 
+    # 3. Exercise score (target 30 mins)
+    exercise = inputs.get("exercise_duration")
+    if exercise is not None:
+        scores["exercise_duration"] = min(1.0, exercise / 30.0)
 
-def compute_health_score(inputs: Dict) -> Optional[int]:
-    component_scores = {}
-    if inputs.get("sleep_duration") is not None:
-        component_scores["sleep_duration"] = _score_in_range(inputs["sleep_duration"], 7, 9)
-    if inputs.get("step_count") is not None:
-        component_scores["step_count"] = _score_at_least(inputs["step_count"], 8000)
-    if inputs.get("exercise_duration") is not None:
-        component_scores["exercise_duration"] = _score_at_least(inputs["exercise_duration"], 30)
-    if inputs.get("water_intake") is not None:
-        component_scores["water_intake"] = _score_at_least(inputs["water_intake"], 2.5)
-    if inputs.get("heart_rate") is not None:
-        component_scores["heart_rate"] = _score_in_range(inputs["heart_rate"], 60, 80)
-    if inputs.get("bmi") is not None:
-        component_scores["bmi"] = _score_in_range(inputs["bmi"], 18.5, 24.9)
-    if inputs.get("stress_level") is not None:
-        stress = str(inputs["stress_level"]).lower()
-        component_scores["stress_level"] = 0.3 if stress == "high" else (0.7 if stress == "medium" else 1.0)
+    # 4. Water intake score (target 2.5L)
+    water = inputs.get("water_intake")
+    if water is not None:
+        scores["water_intake"] = min(1.0, water / 2.5)
 
-    if not component_scores:
+    # 5. Heart rate score (ideal 60-80 bpm)
+    hr = inputs.get("heart_rate")
+    if hr is not None:
+        if 60 <= hr <= 80:
+            scores["heart_rate"] = 1.0
+        elif hr < 60:
+            scores["heart_rate"] = max(0.0, hr / 60.0)
+        else:
+            scores["heart_rate"] = max(0.0, 1.0 - (hr - 80) / 20.0)
+
+    # 6. BMI score (ideal 18.5 - 24.9)
+    bmi = inputs.get("bmi")
+    if bmi is not None:
+        if 18.5 <= bmi <= 24.9:
+            scores["bmi"] = 1.0
+        elif bmi < 18.5:
+            scores["bmi"] = max(0.0, bmi / 18.5)
+        else:
+            scores["bmi"] = max(0.0, 1.0 - (bmi - 24.9) / 6.4)
+
+    # 7. Stress level score
+    stress = inputs.get("stress_level")
+    if stress is not None:
+        stress_str = str(stress).lower()
+        if stress_str == "high":
+            scores["stress_level"] = 0.3
+        elif stress_str == "medium":
+            scores["stress_level"] = 0.7
+        else:
+            scores["stress_level"] = 1.0
+
+    if not scores:
         return None
 
-    total_weight = sum(_WEIGHTS[k] for k in component_scores)
-    weighted_sum = sum(_WEIGHTS[k] * v for k, v in component_scores.items())
+    # Calculate final weighted average score out of 100
+    total_w = sum(WEIGHTS[k] for k in scores)
+    weighted_sum = sum(WEIGHTS[k] * v for k, v in scores.items())
 
-    return int(round(100 * weighted_sum / total_weight))
+    final_score = round((weighted_sum / total_w) * 100)
+    return int(final_score)
