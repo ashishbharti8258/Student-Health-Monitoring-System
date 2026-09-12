@@ -4,7 +4,7 @@
 
 Welcome to the Student Health Risk Predictor project. 
 
-This application was developed as a Machine Learning mini-project to estimate a student's health-risk category (fit, at-risk, or unhealthy) based on daily habits and physiological data. The app takes inputs like sleep duration, resting heart rate, BMI, step count, and stress levels, processes them through a trained LightGBM classifier, and displays the risk prediction, model confidence, class-probability breakdown, and simple wellness suggestions.
+This application was developed as a Machine Learning mini-project to estimate a student's health-risk category (`fit`, `at-risk`, or `unhealthy`) based on daily habits and physiological data. The app takes inputs like sleep duration, resting heart rate, BMI, step count, and stress levels, processes them through a trained LightGBM classifier, and displays the risk prediction, model confidence, class-probability breakdown, and simple wellness suggestions.
 
 ---
 
@@ -21,28 +21,34 @@ This application was developed as a Machine Learning mini-project to estimate a 
 
 ## How the Machine Learning Model Works
 
-The dataset was pre-processed and trained offline using LightGBM. The trained model and preprocessing steps are saved in the models/ folder as .pkl files.
+The dataset was pre-processed and trained offline using LightGBM. The trained model and preprocessing steps are saved in the `models/` folder as `.pkl` files.
 
-During inference, utils/preprocessing.py performs the following steps on the input data:
+During inference, `utils/preprocessing.py` performs the following steps on the input data:
 
-1. **Missing Value Handling:** Fills missing categorical values with "Unknown" and numeric values using the training set medians (avoids data leakage).
+1. **Missing Value Handling:** Fills missing categorical values with `"Unknown"` and numeric values using the training set medians (avoids data leakage).
 2. **One-Hot Encoding:** Encodes categorical variables and aligns them with the exact dummy columns present during model training.
-3. **Scaling:** Normalizes numeric features using standard scaling (StandardScaler).
+3. **Scaling:** Normalizes numeric features using standard scaling (`StandardScaler`).
 4. **Feature Engineering:** Computes 6 custom cross-features:
-   * sedentary_bmi_strain
-   * stress_sleep_deficit
-   * toxic_cardio_load
-   * cardiovascular_load
-   * metabolic_intensity
-   * hydration_ratio
-5. **Prediction and Confidence:** Passes the cleaned features to LightGBM (class_weight='balanced') to get class probabilities and the final predicted label.
+   * `sedentary_bmi_strain`
+   * `stress_sleep_deficit`
+   * `toxic_cardio_load`
+   * `cardiovascular_load`
+   * `metabolic_intensity`
+   * `hydration_ratio`
+5. **Prediction and Confidence:** Passes the cleaned features to LightGBM (`class_weight='balanced'`) to get class probabilities and the final predicted label.
 
 ### Model Performance
+
 During model evaluation, LightGBM outperformed other baseline algorithms tested:
+
 * **LightGBM:** ~0.950 Balanced Accuracy
 * **XGBoost:** ~0.881 Balanced Accuracy
 * **HistGradientBoosting:** ~0.873 Balanced Accuracy
 * **RandomForest:** ~0.866 Balanced Accuracy
+
+---
+
+---
 
 ## Project Structure
 
@@ -63,11 +69,3 @@ student-health-predictor/
 │
 ├── requirements.txt        # Required python packages
 └── README.md               # Project documentation
-
-## Disclaimer
-
-This project is an educational / portfolio machine learning application.
-The predicted health-risk category and the Health Score are analytical
-outputs of a model trained on a dataset and **are not medical diagnoses**.
-They do not constitute medical advice and should never replace consultation
-with a qualified healthcare professional.
