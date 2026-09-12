@@ -63,3 +63,11 @@ student-health-predictor/
 │
 ├── requirements.txt        # Required python packages
 └── README.md               # Project documentation
+
+## Disclaimer
+
+This project is an educational / portfolio machine learning application.
+The predicted health-risk category and the Health Score are analytical
+outputs of a model trained on a dataset and **are not medical diagnoses**.
+They do not constitute medical advice and should never replace consultation
+with a qualified healthcare professional.
